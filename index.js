@@ -47,12 +47,12 @@ server.post("/participants", async (req, res) => {
 	} catch (error) {
 		res.sendStatus(500);
 	}
-})
+});
 
 server.get("/participants", async (req, res) => {
-	const participants = await db.collection("participants").find().toArray()
+	const participants = await db.collection("participants").find().toArray();
 	res.send(participants);
-})
+});
 
 server.post("/messages", async (req, res) => {
 	const {to, text, type} = req.body;
@@ -83,7 +83,7 @@ server.post("/messages", async (req, res) => {
 	} catch(error) {
 		res.sendStatus(500);
 	}
-})
+});
 
 server.get("/messages", async (req, res) => {
 	const { limit } = req.query;
@@ -100,7 +100,25 @@ server.get("/messages", async (req, res) => {
 		}
 		res.send(returnedArrayDB);
 	}
-})
+});
+
+server.post("/status", async (req, res) => {
+	const { user } = req.headers;
+	const findUser = await db.collection("participants").findOne({ name: user });
+	if (!findUser) {
+		return res.sendStatus(404);
+	}
+
+	try {
+		await db.collection("participants").updateOne({ name: user }, { $set: {
+			lastStatus: Date.now()
+		}})
+		res.sendStatus(200);
+	} catch (error) {
+		res.sendStatus(500);
+	}
+	
+});
 
 server.listen(5000, () => {
 	console.log("API está rodando");
