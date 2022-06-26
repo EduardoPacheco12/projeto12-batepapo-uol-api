@@ -8,9 +8,9 @@ dotenv.config();
 
 const server = express();
 server.use(cors());
-server.use(express.json());
+server.use(json());
 
-const mongoClient = new MongoClient("mongodb://127.0.0.1:27017");
+const mongoClient = new MongoClient(process.env.MONGO_URL_CONNECT);
 let db;
 mongoClient.connect().then(() => {
 	db = mongoClient.db("batePapoUOL");
@@ -119,6 +119,24 @@ server.post("/status", async (req, res) => {
 	}
 	
 });
+
+setInterval( async () => {
+	const statusNow = Date.now();
+	const participants = await db.collection("participants").find().toArray();
+	participants.map( async (users) => {
+		const time = statusNow - users.lastStatus;
+		if(time >= 10000) {
+			await db.collection("participants").deleteOne({ name: users.name });
+			await db.collection("messages").insertOne({
+				from: users.name,
+				to: "Todos",
+				text: "sai da sala...",
+				type: "status",
+				time: dayjs().format("HH:mm:ss")
+			});
+		}
+	})
+}, 15000);
 
 server.listen(5000, () => {
 	console.log("API está rodando");
