@@ -10,9 +10,9 @@ const server = express();
 server.use(cors());
 server.use(express.json());
 
-const mongoClient = new MongoClient(process.env.MONGO_URL_CONNECT);
+const mongoClient = new MongoClient("mongodb://127.0.0.1:27017");
 let db;
-client.connect().then(() => {
+mongoClient.connect().then(() => {
 	db = mongoClient.db("batePapoUOL");
 });
 
@@ -52,6 +52,54 @@ server.post("/participants", async (req, res) => {
 server.get("/participants", async (req, res) => {
 	const participants = await db.collection("participants").find().toArray()
 	res.send(participants);
+})
+
+server.post("/messages", async (req, res) => {
+	const {to, text, type} = req.body;
+	const  { user }  = req.headers;
+	const message = {
+		from: user,
+		to,
+		text,
+		type
+	}
+	const dbArray = await db.collection("participants").find({}).toArray();
+	const dbUsers = dbArray.map((index) => index.name)
+	const messageSchema = joi.object({
+		from: joi.string().required().valid(...dbUsers),
+		to: joi.string().required(),
+		text: joi.string().required(),
+		type: joi.string().required().valid("message", "private_message")
+	});
+	const messageValidation = messageSchema.validate(message, { abortEarly: false });
+	if(messageValidation.error) {
+		return res.sendStatus(422);
+	}
+
+	try {
+		message.time = dayjs().format("HH:mm:ss");
+		await db.collection("messages").insertOne(message);
+		res.sendStatus(201);
+	} catch(error) {
+		res.sendStatus(500);
+	}
+})
+
+server.get("/messages", async (req, res) => {
+	const { limit } = req.query;
+	const { user } = req.headers;
+	const dbArray = await db.collection("messages").find({ $or: [{type: "message"}, { $or: [{to:{$in: [user, "Todos"]}}, {from: user}]}]}).toArray();
+	if(!limit || limit > dbArray.length) {
+		res.send(dbArray);
+	} else {
+		let returnedArrayDB = [];
+		for(let i = 0; i < dbArray.length; i++) {
+			if(i >= dbArray.length - limit) {
+				returnedArrayDB.push(dbArray[i])
+			}
+		}
+		res.send(returnedArrayDB);
+	}
 })
 
 server.listen(5000, () => {
